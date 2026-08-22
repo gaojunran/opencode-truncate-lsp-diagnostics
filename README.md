@@ -1,26 +1,34 @@
 # opencode-truncate-lsp-diagnostics
 
-An [OpenCode](https://opencode.ai) plugin that keeps the LSP diagnostics block appended after `write`, `edit`, and `apply_patch` from flooding the agent transcript. It does two things:
+An [OpenCode](https://opencode.ai) plugin that trims the LSP diagnostics block
+that `write`, `edit`, and `apply_patch` append after every edit.
 
-1. **Session-lifetime baseline** — diagnostics that were already reported in a previous round are filtered out, so the model only sees *newly introduced* errors.
-2. **Cap + spill** — if the remaining new diagnostics still exceed a configurable count, only the first few are shown inline and the full list is written to a temp file that the model is told to read.
+## Why this exists
 
-## Problem
+After each edit, OpenCode's edit tools append the current LSP errors to the
+tool output. In a project with many outstanding errors this block is large, and
+most of it is residual errors the model already knows about and did not
+introduce.
 
-After each file edit, OpenCode appends the current LSP diagnostics to the tool output:
+OpenCode's own TUI, and most frontends, already collapse or fold long tool
+output themselves. This plugin is for the ones that do not — for example Zed,
+which renders tool output raw and leaves it expanded by default.
 
-```
-Wrote file successfully.
+## What it does
 
-LSP errors detected in this file, please fix:
-<diagnostics file="/path/to/file.ts">
-ERROR [171:32] 'Promise' only refers to a type...
-ERROR [197:20] 'Promise' only refers to a type...
-... 12 more lines ...
-</diagnostics>
-```
+1. **Session baseline** — diagnostics already reported in a previous round are
+   filtered out, so the model only sees newly introduced errors.
+2. **Cap + spill** — if the remaining new diagnostics still exceed a
+   configurable count, only the first few are shown inline and the full list is
+   written to a temp file the model is told to read.
 
-In a codebase with many outstanding errors this block can be huge, and most of it is *residual* errors the model already knows about and did not introduce. This plugin removes the noise so the transcript shows only what changed.
+## Limits
+
+- The token savings are small. If all you want is to cut tool-output tokens,
+  this plugin is probably not worth installing — tools like magic-context
+  already truncate tool calls and do it more thoroughly.
+- Hiding known diagnostics should give the model less noise, but this has not
+  been benchmarked and the expected benefit is modest.
 
 ## Install
 
@@ -50,11 +58,11 @@ Pass options as a tuple:
 }
 ```
 
-| Option   | Type       | Default                          | Description                                                                 |
-| -------- | ---------- | -------------------------------- | --------------------------------------------------------------------------- |
-| `cap`    | `number`   | `3`                              | Max *new* diagnostics to show inline. `0` spills every new diagnostic to a file. |
-| `tools`  | `string[]` | `["write", "edit", "apply_patch"]`          | Tool ids whose output is inspected.                          |
-| `tmpDir` | `string`   | OS temp dir                      | Directory where spill files are written.                                     |
+| Option   | Type       | Default                            | Description                                                              |
+| -------- | ---------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `cap`    | `number`   | `3`                                | Max *new* diagnostics to show inline. `0` spills every new diagnostic to a file. |
+| `tools`  | `string[]` | `["write", "edit", "apply_patch"]` | Tool ids whose output is inspected.                                      |
+| `tmpDir` | `string`   | OS temp dir                        | Directory where spill files are written.                                 |
 
 ## Example
 
@@ -85,11 +93,17 @@ ERROR [600:10] Cannot find name 'newSymbol'.
 
 ## How it works
 
-The plugin registers an OpenCode `tool.execute.after` hook and rewrites `output.output` in place, keeping the edit-result head and replacing the diagnostics tail. A module-level baseline maps each file to the number of occurrences of each diagnostic identity seen in the previous round. Identity is content-based rather than position-based: the `[line:col]` location is ignored, so a diagnostic that only shifted lines (an edit inserted or removed lines above it) is still recognized as seen and filtered out. Identical messages are counted, so a new occurrence of an already-seen message is still reported, while a fixed error that reappears is reported again.
+The plugin registers a `tool.execute.after` hook and rewrites `output.output`
+in place. A module-level baseline counts each diagnostic identity (severity +
+message) per file; the `[line:col]` location is ignored, so a diagnostic that
+only shifted lines is still recognized as seen. A message whose count increases
+from one round to the next has that many new occurrences.
 
-> Note: OpenCode's `tool.execute.after` hook signature returns `Promise<void>`, so the plugin mutates `output.output` rather than returning a replacement string. This relies on OpenCode passing the same output object through to the model, which is the current behavior (verified against OpenCode 1.18.21) but is not part of the documented contract.
-
-The tool list defaults to `write`, `edit`, and `apply_patch` because GPT-family models hide `write`/`edit` in favor of `apply_patch`, and all three append the same diagnostics block.
+> Note: the `tool.execute.after` hook returns `Promise<void>`, so the plugin
+> mutates `output.output` rather than returning a new string. This relies on
+> OpenCode passing the same output object through to the model — current
+> behavior (verified against OpenCode 1.18.21), but not part of the documented
+> contract.
 
 ## Development
 
