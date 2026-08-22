@@ -1,0 +1,51 @@
+{
+  "name": "opencode-truncate-lsp-diagnostics",
+  "version": "0.1.0",
+  "description": "OpenCode plugin that truncates the LSP diagnostics block appended to write/edit/patch tool output, so edits stay readable.",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "lsp",
+    "diagnostics",
+    "truncate",
+    "agent"
+  ],
+  "author": "gaojunran <nebula2021@126.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gaojunran/opencode-truncate-lsp-diagnostics.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gaojunran/opencode-truncate-lsp-diagnostics/issues"
+  },
+  "homepage": "https://github.com/gaojunran/opencode-truncate-lsp-diagnostics#readme",
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.18.21",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
