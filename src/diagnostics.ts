@@ -28,8 +28,8 @@ const DIAGNOSTIC_LINE_RE = /^(?:ERROR|WARN|INFO|HINT)\s+\[\d+:\d+\][^\n]*/gm
 // Identity of a diagnostic is its content, not its position: `[line:col]`
 // shifts whenever an edit above inserts or removes lines, so it must not be
 // part of the baseline key. Stripping the location leaves `SEVERITY message`,
-// which survives those shifts. Repeated identical messages are deduplicated,
-// which is the safe direction (under-report rather than re-flood).
+// which survives those shifts. Identical messages collapse to a count so a new
+// occurrence of an already-seen message is still reported.
 function diagnosticKey(line: string): string {
   return line.replace(/\[\d+:\d+\]\s*/, "")
 }
@@ -74,7 +74,7 @@ function parseBlocks(text: string): { head: string; blocks: Block[] } {
 
 export function processToolOutput(
   text: string,
-  baseline: Map<string, Set<string>>,
+  baseline: Map<string, Map<string, number>>,
   options: ProcessOptions,
 ): ProcessResult {
   const { head, blocks } = parseBlocks(text)
@@ -82,13 +82,36 @@ export function processToolOutput(
     return { output: text }
   }
 
-  // Baseline-filter each block: keep only lines not seen in the previous round
-  // for that file, then replace the baseline with the current line set.
+  // Baseline-filter each block by counting messages: a message that appears
+  // more times this round than last round has that many new occurrences. The
+  // baseline is replaced with the current counts each round. Which specific
+  // occurrence is new is unknowable from content alone, so the first `newCount`
+  // occurrences of each message are kept (a deterministic pick; the message is
+  // what the model acts on).
   for (const block of blocks) {
-    const previous = baseline.get(block.file) ?? new Set<string>()
-    block.newLines = block.lines.filter((line) => !previous.has(diagnosticKey(line)))
+    const previousCounts = baseline.get(block.file) ?? new Map<string, number>()
+    const currentCounts = new Map<string, number>()
+    for (const line of block.lines) {
+      const key = diagnosticKey(line)
+      currentCounts.set(key, (currentCounts.get(key) ?? 0) + 1)
+    }
+    const newCounts = new Map<string, number>()
+    for (const [key, count] of currentCounts) {
+      newCounts.set(key, Math.max(0, count - (previousCounts.get(key) ?? 0)))
+    }
+    const kept = new Map<string, number>()
+    block.newLines = []
+    for (const line of block.lines) {
+      const key = diagnosticKey(line)
+      const limit = newCounts.get(key) ?? 0
+      const keptCount = kept.get(key) ?? 0
+      if (keptCount < limit) {
+        block.newLines.push(line)
+        kept.set(key, keptCount + 1)
+      }
+    }
     block.omitted = block.lines.length - block.newLines.length
-    baseline.set(block.file, new Set(block.lines.map(diagnosticKey)))
+    baseline.set(block.file, currentCounts)
   }
 
   // Current file first, everything else keeps its original relative order.

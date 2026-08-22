@@ -26,10 +26,11 @@ export const truncateLspDiagnostics: Plugin = async (_input, rawOptions) => {
   const cap = options.cap ?? 3
   const tmpDir = options.tmpDir ?? tmpdir()
 
-  // Session-lifetime baseline: file -> set of diagnostic lines seen in the
-  // previous round. Lines that persist across rounds are filtered out so the
-  // model only sees newly introduced diagnostics.
-  const baseline = new Map<string, Set<string>>()
+  // Session-lifetime baseline: file -> (diagnostic message -> occurrence count)
+  // from the previous round. A message that appears more times this round than
+  // last round has that many new occurrences; the baseline is replaced with the
+  // current counts each round.
+  const baseline = new Map<string, Map<string, number>>()
 
   return {
     "tool.execute.after": async (input, output) => {

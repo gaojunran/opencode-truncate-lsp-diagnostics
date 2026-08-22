@@ -145,4 +145,58 @@ ERROR [10:1] error in main file
     )
     expect(result.spill).toBeDefined()
   })
+
+  test("reports a new occurrence when a repeated message's count increases", () => {
+    const baseline = makeBaseline()
+    const three = `Wrote file successfully.
+
+LSP errors detected in this file, please fix:
+<diagnostics file="/abs/player-manager.ts">
+ERROR [896:30] Cannot find name 'debugToWecube'.
+ERROR [896:31] Cannot find name 'debugToWecube'.
+ERROR [896:32] Cannot find name 'debugToWecube'.
+</diagnostics>`
+    processToolOutput(three, baseline, makeOptions({ cap: 99 }))
+
+    const four = `Wrote file successfully.
+
+LSP errors detected in this file, please fix:
+<diagnostics file="/abs/player-manager.ts">
+ERROR [900:30] Cannot find name 'debugToWecube'.
+ERROR [900:31] Cannot find name 'debugToWecube'.
+ERROR [900:32] Cannot find name 'debugToWecube'.
+ERROR [900:40] Cannot find name 'debugToWecube'.
+</diagnostics>`
+
+    const result = processToolOutput(four, baseline, makeOptions({ cap: 99 }))
+    expect(result.output).toContain("ERROR [900:30]")
+    expect(result.output).not.toContain("ERROR [900:32]")
+    expect(result.output).toContain("3 previously-seen LSP diagnostics omitted")
+  })
+
+  test("does not report when a repeated message's count decreases", () => {
+    const baseline = makeBaseline()
+    const three = `Wrote file successfully.
+
+LSP errors detected in this file, please fix:
+<diagnostics file="/abs/player-manager.ts">
+ERROR [896:30] Cannot find name 'debugToWecube'.
+ERROR [896:31] Cannot find name 'debugToWecube'.
+ERROR [896:32] Cannot find name 'debugToWecube'.
+</diagnostics>`
+    processToolOutput(three, baseline, makeOptions({ cap: 99 }))
+
+    const two = `Wrote file successfully.
+
+LSP errors detected in this file, please fix:
+<diagnostics file="/abs/player-manager.ts">
+ERROR [900:30] Cannot find name 'debugToWecube'.
+ERROR [900:32] Cannot find name 'debugToWecube'.
+</diagnostics>`
+
+    const result = processToolOutput(two, baseline, makeOptions({ cap: 99 }))
+    expect(result.output).toBe(
+      "Wrote file successfully.\n\n(2 previously-seen LSP diagnostics omitted)",
+    )
+  })
 })
