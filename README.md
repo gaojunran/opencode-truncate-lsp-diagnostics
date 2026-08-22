@@ -85,7 +85,7 @@ ERROR [600:10] Cannot find name 'newSymbol'.
 
 ## How it works
 
-The plugin registers an OpenCode `tool.execute.after` hook and rewrites `output.output` in place, keeping the edit-result head and replacing the diagnostics tail. A module-level baseline maps each file to the set of diagnostic lines seen in the previous round; lines that persist are filtered out, and the baseline is replaced with the current set so regressions (a previously-fixed error reappearing) are still reported.
+The plugin registers an OpenCode `tool.execute.after` hook and rewrites `output.output` in place, keeping the edit-result head and replacing the diagnostics tail. A module-level baseline maps each file to the set of diagnostic identities seen in the previous round. Identity is content-based rather than position-based: the `[line:col]` location is ignored, so a diagnostic that only shifted lines (an edit inserted or removed lines above it) is still recognized as seen and filtered out. The baseline is replaced with the current set each round, so a previously-fixed error that reappears is still reported. Repeated identical messages are deduplicated, which under-reports rather than re-flooding the transcript.
 
 > Note: OpenCode's `tool.execute.after` hook signature returns `Promise<void>`, so the plugin mutates `output.output` rather than returning a replacement string. This relies on OpenCode passing the same output object through to the model, which is the current behavior (verified against OpenCode 1.18.21) but is not part of the documented contract.
 

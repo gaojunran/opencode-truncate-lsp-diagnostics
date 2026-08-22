@@ -53,6 +53,50 @@ ERROR [600:10] Cannot find name 'newSymbol'.
     expect(result.spill).toBeUndefined()
   })
 
+  test("does not re-report diagnostics that only shifted line numbers", () => {
+    const baseline = makeBaseline()
+    processToolOutput(writeOutput, baseline, makeOptions({ cap: 99 }))
+
+    // Same diagnostics, every line number shifted +10 (an edit inserted 10 lines above).
+    const shifted = `Wrote file successfully.
+
+LSP errors detected in this file, please fix:
+<diagnostics file="/abs/player-manager.ts">
+ERROR [181:32] 'Promise' only refers to a type, but is being used as a value here.
+ERROR [207:20] 'Promise' only refers to a type, but is being used as a value here.
+ERROR [297:110] 'Promise' only refers to a type, but is being used as a value here.
+ERROR [298:23] Parameter 'isLoggedIn' implicitly has an 'any' type.
+ERROR [512:27] An async function or method in ES5/ES3 requires the 'Promise' constructor.
+</diagnostics>`
+
+    const result = processToolOutput(shifted, baseline, makeOptions({ cap: 99 }))
+    expect(result.output).toBe(
+      "Wrote file successfully.\n\n(5 previously-seen LSP diagnostics omitted)",
+    )
+  })
+
+  test("reports a new diagnostic whose message matches a shifted residual", () => {
+    const baseline = makeBaseline()
+    processToolOutput(writeOutput, baseline, makeOptions({ cap: 99 }))
+
+    // One residual error fixed, its message reused at a new location, plus the rest shifted.
+    const next = `Wrote file successfully.
+
+LSP errors detected in this file, please fix:
+<diagnostics file="/abs/player-manager.ts">
+ERROR [181:32] 'Promise' only refers to a type, but is being used as a value here.
+ERROR [207:20] 'Promise' only refers to a type, but is being used as a value here.
+ERROR [297:110] 'Promise' only refers to a type, but is being used as a value here.
+ERROR [298:23] Parameter 'isLoggedIn' implicitly has an 'any' type.
+ERROR [999:10] Brand new error never seen before.
+</diagnostics>`
+
+    const result = processToolOutput(next, baseline, makeOptions({ cap: 99 }))
+    expect(result.output).toContain("ERROR [999:10]")
+    expect(result.output).not.toContain("ERROR [181:32]")
+    expect(result.output).toContain("4 previously-seen LSP diagnostics omitted")
+  })
+
   test("caps new diagnostics and spills the rest to a file", () => {
     const result = processToolOutput(writeOutput, makeBaseline(), makeOptions({ cap: 2 }))
     expect(result.output).toContain("ERROR [171:32]")

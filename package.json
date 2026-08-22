@@ -1,6 +1,6 @@
 {
   "name": "opencode-truncate-lsp-diagnostics",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "OpenCode plugin that hides previously-seen LSP diagnostics and caps new ones per edit, spilling the full list to a file so edits stay readable.",
   "type": "module",
   "license": "MIT",

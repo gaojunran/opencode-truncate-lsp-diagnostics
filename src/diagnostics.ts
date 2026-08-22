@@ -25,6 +25,15 @@ const DIAGNOSTIC_MARKER = "LSP errors detected"
 // severity diagnostics in these blocks, so the alternatives are defensive.
 const DIAGNOSTIC_LINE_RE = /^(?:ERROR|WARN|INFO|HINT)\s+\[\d+:\d+\][^\n]*/gm
 
+// Identity of a diagnostic is its content, not its position: `[line:col]`
+// shifts whenever an edit above inserts or removes lines, so it must not be
+// part of the baseline key. Stripping the location leaves `SEVERITY message`,
+// which survives those shifts. Repeated identical messages are deduplicated,
+// which is the safe direction (under-report rather than re-flood).
+function diagnosticKey(line: string): string {
+  return line.replace(/\[\d+:\d+\]\s*/, "")
+}
+
 // Matches an opencode diagnostics block:
 //   LSP errors detected in this file, please fix:\n<diagnostics file="...">\n...\n</diagnostics>
 // The label before the colon is captured verbatim so it can be reproduced as-is.
@@ -77,9 +86,9 @@ export function processToolOutput(
   // for that file, then replace the baseline with the current line set.
   for (const block of blocks) {
     const previous = baseline.get(block.file) ?? new Set<string>()
-    block.newLines = block.lines.filter((line) => !previous.has(line))
+    block.newLines = block.lines.filter((line) => !previous.has(diagnosticKey(line)))
     block.omitted = block.lines.length - block.newLines.length
-    baseline.set(block.file, new Set(block.lines))
+    baseline.set(block.file, new Set(block.lines.map(diagnosticKey)))
   }
 
   // Current file first, everything else keeps its original relative order.
