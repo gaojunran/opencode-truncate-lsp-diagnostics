@@ -18,7 +18,7 @@ export interface TruncateLspPluginOptions {
   tmpDir?: string
 }
 
-const DEFAULT_TOOLS = ["write", "edit", "patch", "apply_patch"]
+const DEFAULT_TOOLS = ["write", "edit", "apply_patch"]
 
 export const truncateLspDiagnostics: Plugin = async (_input, rawOptions) => {
   const options = (rawOptions ?? {}) as TruncateLspPluginOptions

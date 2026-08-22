@@ -1,6 +1,6 @@
 # opencode-truncate-lsp-diagnostics
 
-An [OpenCode](https://opencode.ai) plugin that keeps the LSP diagnostics block appended after `write`, `edit`, `patch`, and `apply_patch` from flooding the agent transcript. It does two things:
+An [OpenCode](https://opencode.ai) plugin that keeps the LSP diagnostics block appended after `write`, `edit`, and `apply_patch` from flooding the agent transcript. It does two things:
 
 1. **Session-lifetime baseline** — diagnostics that were already reported in a previous round are filtered out, so the model only sees *newly introduced* errors.
 2. **Cap + spill** — if the remaining new diagnostics still exceed a configurable count, only the first few are shown inline and the full list is written to a temp file that the model is told to read.
@@ -53,7 +53,7 @@ Pass options as a tuple:
 | Option   | Type       | Default                          | Description                                                                 |
 | -------- | ---------- | -------------------------------- | --------------------------------------------------------------------------- |
 | `cap`    | `number`   | `3`                              | Max *new* diagnostics to show inline. `0` spills every new diagnostic to a file. |
-| `tools`  | `string[]` | `["write", "edit", "patch", "apply_patch"]` | Tool ids whose output is inspected.                          |
+| `tools`  | `string[]` | `["write", "edit", "apply_patch"]`          | Tool ids whose output is inspected.                          |
 | `tmpDir` | `string`   | OS temp dir                      | Directory where spill files are written.                                     |
 
 ## Example
@@ -80,7 +80,7 @@ LSP errors detected in this file, please fix:
 <diagnostics file="/path/to/file.ts">
 ERROR [600:10] Cannot find name 'newSymbol'.
 </diagnostics>
-(2 previously-seen LSP diagnostics omitted)
+(3 previously-seen LSP diagnostics omitted)
 ```
 
 ## How it works
@@ -89,7 +89,7 @@ The plugin registers an OpenCode `tool.execute.after` hook and rewrites `output.
 
 > Note: OpenCode's `tool.execute.after` hook signature returns `Promise<void>`, so the plugin mutates `output.output` rather than returning a replacement string. This relies on OpenCode passing the same output object through to the model, which is the current behavior (verified against OpenCode 1.18.21) but is not part of the documented contract.
 
-The tool list defaults to `write`, `edit`, `patch`, and `apply_patch` because GPT-family models hide `write`/`edit` in favor of `apply_patch`, and all four append the same diagnostics block.
+The tool list defaults to `write`, `edit`, and `apply_patch` because GPT-family models hide `write`/`edit` in favor of `apply_patch`, and all three append the same diagnostics block.
 
 ## Development
 
